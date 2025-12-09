@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terraforming Canvas UI</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;500;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'sci-fi': ['Rajdhani', 'sans-serif'],
+                        'body': ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'neon-blue': '#00f3ff',
+                        'neon-purple': '#bc13fe',
+                        'deep-space': '#050b14',
+                        'glass': 'rgba(10, 20, 40, 0.6)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        body, html { margin: 0; padding: 0; overflow: hidden; background-color: #050b14; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+        #ui-root { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+        /* Enable pointer events on specific UI elements */
+        .interactive { pointer-events: auto; }
+        
+        .glass-panel {
+            background: rgba(5, 11, 20, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 243, 255, 0.1);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .sci-fi-text {
+            text-shadow: 0 0 5px rgba(0, 243, 255, 0.5);
+        }
+
+        /* Custom Scrollbar for dashboard panels */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 243, 255, 0.3); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0, 243, 255, 0.6); }
+
+        @keyframes pulse-border {
+            0% { border-color: rgba(0, 243, 255, 0.1); }
+            50% { border-color: rgba(0, 243, 255, 0.5); }
+            100% { border-color: rgba(0, 243, 255, 0.1); }
+        }
+        .animate-pulse-border {
+            animation: pulse-border 2s infinite;
+        }
+    </style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+<div id="ui-root"></div>
+
+<script type="text/babel">
+
+    // --- THREE.JS ENGINE ---
+    class TerraformingEngine {
+        constructor(container) {
+            this.container = container;
+            this.width = window.innerWidth;
+            this.height = window.innerHeight;
+            
+            // Core
+            this.scene = new THREE.Scene();
+            this.scene.background = new THREE.Color(0x020408);
+            this.scene.fog = new THREE.FogExp2(0x020408, 0.015); // Volumetric feel
+
+            this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, 0.1, 1000);
+            this.camera.position.set(0, 15, 25);
+            this.camera.lookAt(0, 0, 0);
+
+            this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            this.renderer.setSize(this.width, this.height);
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            this.container.appendChild(this.renderer.domElement);
+
+            // Time & Interaction
+            this.clock = new THREE.Clock();
+            this.mouse = new THREE.Vector2();
+            this.raycaster = new THREE.Raycaster();
+            this.isHovering = false;
+            
+            // Terrain Physics Data
+            this.gridSize = 60;
+            this.gridSegments = 64; 
+            this.baseHeight = -5;
+            this.impulseStrength = 3.5;
+            this.decay = 0.96; // How fast terrain returns to normal
+            
+            this.initLights();
+            this.initTerrain();
+            this.initFlora(); // Crystals
+            this.initParticles();
+            
+            // Bindings
+            window.addEventListener('resize', this.onResize.bind(this));
+            window.addEventListener('mousemove', this.onMouseMove.bind(this));
+            window.addEventListener('mousedown', this.onClick.bind(this));
+            
+            this.animate();
+        }
+
+        initLights() {
+            const ambient = new THREE.AmbientLight(0x404040, 1.5); // Soft base
+            this.scene.add(ambient);
+
+            // Dynamic blue light that follows cursor logic (simulated)
+            this.cursorLight = new THREE.PointLight(0x00f3ff, 2, 20);
+            this.cursorLight.position.set(0, 5, 0);
+            this.scene.add(this.cursorLight);
+
+            // Secondary purple light for depth
+            const purpleLight = new THREE.PointLight(0xbc13fe, 1.5, 30);
+            purpleLight.position.set(20, 10, -10);
+            this.scene.add(purpleLight);
+        }
+
+        initTerrain() {
+            // Geometry
+            const geometry = new THREE.PlaneBufferGeometry(this.gridSize, this.gridSize, this.gridSegments, this.gridSegments);
+            geometry.rotateX(-Math.PI / 2);
+            geometry.translate(0, this.baseHeight, 0);
+
+            // Store original positions for spring physics
+            this.originalPositions = geometry.attributes.position.array.slice();
+            this.currentPositions = geometry.attributes.position.array.slice();
+            this.velocities = new Float32Array(this.originalPositions.length).fill(0);
+
+            // Material - Tech Grid Look
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x051121,
+                emissive: 0x001133,
+                emissiveIntensity: 0.2,
+                roughness: 0.2,
+                metalness: 0.8,
+                flatShading: true,
+                wireframe: false
+            });
+
+            this.terrain = new THREE.Mesh(geometry, material);
+            this.scene.add(this.terrain);
+
+            // Wireframe Overlay
+            const wireGeo = new THREE.WireframeGeometry(geometry);
+            const wireMat = new THREE.LineBasicMaterial({ color: 0x00f3ff, transparent: true, opacity: 0.15 });
+            this.wireframe = new THREE.LineSegments(wireGeo, wireMat);
+            this.terrain.add(this.wireframe);
+        }
+
+        initFlora() {
+            // Instanced mesh for bioluminescent flora (crystals)
+            const count = 300;
+            const geo = new THREE.ConeGeometry(0.2, 1, 4);
+            const mat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
+            
+            this.flora = new THREE.InstancedMesh(geo, mat, count);
+            this.flora.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            this.scene.add(this.flora);
+
+            this.floraTransforms = [];
+            const dummy = new THREE.Object3D();
+
+            // Initialize off-screen
+            for (let i = 0; i < count; i++) {
+                dummy.position.set(0, -100, 0);
+                dummy.updateMatrix();
+                this.flora.setMatrixAt(i, dummy.matrix);
+                this.floraTransforms.push({
+                    active: false,
+                    scale: 0,
+                    x: 0, z: 0,
+                    id: i
+                });
+            }
+        }
+
+        initParticles() {
+            const particleCount = 200;
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(particleCount * 3);
+            
+            // Init positions far away
+            for(let i=0; i<particleCount*3; i++) pos[i] = 0;
+            
+            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            
+            const mat = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.3,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+            
+            this.particleSystem = new THREE.Points(geo, mat);
+            this.scene.add(this.particleSystem);
+            
+            this.particles = []; // Logic container
+            for(let i=0; i<particleCount; i++) {
+                this.particles.push({ x:0, y:-50, z:0, vx:0, vy:0, vz:0, life: 0 });
+            }
+        }
+
+        spawnParticles(x, z) {
+            // Reset some particles
+            let spawned = 0;
+            for(let i=0; i<this.particles.length; i++) {
+                if(spawned > 20) break;
+                if(this.particles[i].life <= 0) {
+                    const p = this.particles[i];
+                    p.x = x;
+                    p.y = this.getTerrainHeightAt(x, z) + 1;
+                    p.z = z;
+                    p.vx = (Math.random() - 0.5) * 0.5;
+                    p.vy = Math.random() * 0.5 + 0.2; // Upward burst
+                    p.vz = (Math.random() - 0.5) * 0.5;
+                    p.life = 1.0;
+                    spawned++;
+                }
+            }
+        }
+
+        getTerrainHeightAt(x, z) {
+            // Approximate height (simple logic as we modify Y axis of plane based on index)
+            // Ideally we assume base height for particle spawn if calculation is heavy
+            return this.baseHeight; 
+        }
+
+        triggerRipple(x, z, strength = 1.0) {
+            // Apply impulse to vertices near x, z
+            const positions = this.terrain.geometry.attributes.position.array;
+            
+            // Brute force distance check (optimized by grid segments logic ideally, but raw loop ok for <10k verts)
+            const radius = 6.0;
+            
+            for (let i = 0; i < positions.length; i += 3) {
+                const vx = positions[i];
+                const vy = positions[i + 1]; // This is actually Z in world space because plane is rotated? 
+                // PlaneBufferGeometry: i=x, i+1=y, i+2=z.
+                // We rotated X by -90deg. 
+                // Local (x, y, 0) -> World (x, 0, -y) roughly.
+                // Actually, let's just use the world position logic.
+                
+                // Since we mutated the array directly, we need to be careful.
+                // Simplification: We iterate the buffer.
+                // Local coords.
+                const px = this.originalPositions[i];
+                const py = this.originalPositions[i+1];
+                
+                const dist = Math.sqrt((px - x)**2 + (py - z)**2); // Z is Y in plane geometry before rotation
+                
+                if (dist < radius) {
+                    // Pull UP
+                    const force = Math.cos(dist / radius * Math.PI / 2) * this.impulseStrength * strength;
+                    this.velocities[i+2] += force * 0.1; // Add to Z velocity (which is Y in world)
+                }
+            }
+        }
+
+        updatePhysics() {
+            const positions = this.terrain.geometry.attributes.position.array;
+            
+            // 1. Terrain Physics
+            for (let i = 0; i < positions.length; i += 3) {
+                // Hooke's Law (Spring) + Damping
+                const currentH = positions[i+2];
+                const targetH = this.originalPositions[i+2];
+                
+                const force = (targetH - currentH) * 0.05; // Spring stiffness
+                this.velocities[i+2] += force;
+                this.velocities[i+2] *= this.decay; // Damping
+                
+                positions[i+2] += this.velocities[i+2];
+
+                // Flora spawning logic: If vertex is high, show crystal
+                // Optimization: Don't check every vertex every frame for flora, map vaguely
+            }
+            this.terrain.geometry.attributes.position.needsUpdate = true;
+            
+            // Sync wireframe
+            this.wireframe.geometry.attributes.position.array.set(positions);
+            this.wireframe.geometry.attributes.position.needsUpdate = true;
+
+            // 2. Cursor Interaction
+            if (this.intersects) {
+                const pt = this.intersects[0].point;
+                this.cursorLight.position.x = pt.x;
+                this.cursorLight.position.z = pt.z;
+                
+                // Continuous drag effect
+                this.triggerRipple(pt.x, pt.z, 0.2);
+            }
+
+            // 3. Flora Update
+            const dummy = new THREE.Object3D();
+            let activeFloraCount = 0;
+            
+            // We'll map flora to random vertices, but scale them based on vertex height
+            // This is a pseudo-effect to make them look like they bloom from energy
+            for(let i=0; i<this.floraTransforms.length; i++) {
+                const f = this.floraTransforms[i];
+                // Map to a vertex (deterministically random)
+                const vertIndex = Math.floor((i / this.floraTransforms.length) * (positions.length / 3)) * 3;
+                
+                const h = positions[vertIndex + 2]; // Current height
+                const x = positions[vertIndex];
+                const y = positions[vertIndex + 1]; // Plane Y (World Z)
+
+                if (h > this.baseHeight + 0.5) {
+                    // Bloom
+                    f.scale += (1 - f.scale) * 0.1;
+                } else {
+                    // Wither
+                    f.scale += (0 - f.scale) * 0.1;
+                }
+
+                if (f.scale > 0.01) {
+                    dummy.position.set(x, h, -y); // Correct for rotation
+                    // dummy.lookAt(this.camera.position);
+                    dummy.scale.set(f.scale, f.scale, f.scale);
+                    dummy.rotation.x = -Math.PI/2; // align with normal approx
+                    dummy.updateMatrix();
+                    this.flora.setMatrixAt(i, dummy.matrix);
+                } else {
+                    dummy.position.set(0, -100, 0); // Hide
+                    dummy.updateMatrix();
+                    this.flora.setMatrixAt(i, dummy.matrix);
+                }
+            }
+            this.flora.instanceMatrix.needsUpdate = true;
+
+            // 4. Particle Update
+            const pPos = this.particleSystem.geometry.attributes.position.array;
+            for(let i=0; i<this.particles.length; i++) {
+                const p = this.particles[i];
+                if(p.life > 0) {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.z += p.vz;
+                    p.vy -= 0.02; // Gravity
+                    p.life -= 0.02;
+                    
+                    pPos[i*3] = p.x;
+                    pPos[i*3+1] = p.y;
+                    pPos[i*3+2] = p.z;
+                } else {
+                    pPos[i*3+1] = -100; // Hide
+                }
+            }
+            this.particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+
+        onMouseMove(event) {
+            this.mouse.x = (event.clientX / this.width) * 2 - 1;
+            this.mouse.y = -(event.clientY / this.height) * 2 + 1;
+
+            this.raycaster.setFromCamera(this.mouse, this.camera);
+            // Raycast against an invisible plane at height baseHeight for consistency
+            // Or just the terrain mesh
+            const intersects = this.raycaster.intersectObject(this.terrain);
+            if (intersects.length > 0) {
+                this.intersects = intersects;
+            } else {
+                this.intersects = null;
+            }
+        }
+
+        onClick(event) {
+            if (this.intersects) {
+                const pt = this.intersects[0].point;
+                // Big Explosion
+                this.triggerRipple(pt.x, pt.z, 5.0);
+                this.spawnParticles(pt.x, pt.z);
+            }
+        }
+
+        // External hook for UI
+        triggerUIEvent(type) {
+            if (type === 'bloom') {
+                // Random ripples
+                const x = (Math.random() - 0.5) * 20;
+                const z = (Math.random() - 0.5) * 20;
+                this.triggerRipple(x, z, 3.0);
+                this.spawnParticles(x, z);
+            }
+            if (type === 'hover') {
+                 // Enhance noise or lift center
+                 this.triggerRipple(0, 0, 1.0);
+            }
+        }
+
+        onResize() {
+            this.width = window.innerWidth;
+            this.height = window.innerHeight;
+            this.camera.aspect = this.width / this.height;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(this.width, this.height);
+        }
+
+        animate() {
+            requestAnimationFrame(this.animate.bind(this));
+            
+            const time = this.clock.getElapsedTime();
+            
+            // Subtle ambient movement
+            this.terrain.rotation.z = Math.sin(time * 0.05) * 0.02;
+            
+            this.updatePhysics();
+            
+            this.renderer.render(this.scene, this.camera);
+        }
+    }
+
+    // --- REACT COMPONENTS ---
+
+    const Icon = ({ name, className }) => {
+        // Simple SVG icons
+        if (name === 'chart') return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
+        if (name === 'users') return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>;
+        if (name === 'cpu') return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>;
+        if (name === 'send') return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>;
+        return null;
+    };
+
+    const App = () => {
+        const [engine, setEngine] = React.useState(null);
+        const [activeTab, setActiveTab] = React.useState('dashboard');
+        const [messages, setMessages] = React.useState([
+            { id: 1, sender: 'AI', text: 'System initialized. Terraforming protocols active. How can I assist with the data landscape?' }
+        ]);
+        const [inputText, setInputText] = React.useState('');
+
+        React.useEffect(() => {
+            const container = document.getElementById('canvas-container');
+            const eng = new TerraformingEngine(container);
+            setEngine(eng);
+        }, []);
+
+        const handleHover = () => {
+            if (engine) engine.triggerUIEvent('hover');
+        };
+
+        const handleClick = () => {
+            if (engine) engine.triggerUIEvent('bloom');
+        };
+
+        const sendMessage = (e) => {
+            e.preventDefault();
+            if (!inputText.trim()) return;
+            
+            const newMsg = { id: Date.now(), sender: 'User', text: inputText };
+            setMessages(prev => [...prev, newMsg]);
+            setInputText('');
+            
+            // Visual Effect
+            if(engine) engine.triggerUIEvent('bloom');
+
+            // AI Response simulation
+            setTimeout(() => {
+                setMessages(prev => [...prev, { id: Date.now()+1, sender: 'AI', text: 'Analyzing terrain topography... Data point added.' }]);
+                if(engine) engine.triggerUIEvent('bloom');
+            }, 1000);
+        };
+
+        return (
+            <div className="flex h-screen w-full text-white font-body selection:bg-neon-blue selection:text-black">
+                
+                {/* Sidebar Navigation */}
+                <div className="w-20 lg:w-64 flex flex-col justify-between interactive glass-panel z-20 transition-all duration-300">
+                    <div className="p-6">
+                        <h1 className="hidden lg:block text-2xl font-sci-fi font-bold tracking-widest text-neon-blue mb-8">
+                            TERRA<span className="text-white">FORM</span>
+                        </h1>
+                        <div className="space-y-4">
+                            {['dashboard', 'analytics', 'network'].map((tab) => (
+                                <button 
+                                    key={tab}
+                                    onClick={() => { setActiveTab(tab); handleClick(); }}
+                                    onMouseEnter={handleHover}
+                                    className={`w-full flex items-center p-3 rounded-lg transition-all duration-300 border border-transparent ${activeTab === tab ? 'bg-neon-blue/20 border-neon-blue/50 text-neon-blue' : 'hover:bg-white/5 hover:border-white/10'}`}
+                                >
+                                    <Icon name={tab === 'dashboard' ? 'chart' : tab === 'analytics' ? 'cpu' : 'users'} className="w-6 h-6" />
+                                    <span className="hidden lg:block ml-3 capitalize font-sci-fi">{tab}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="p-6 border-t border-white/10">
+                        <div className="flex items-center space-x-3">
+                            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                            <span className="hidden lg:block text-xs text-gray-400 font-mono">SYS.ONLINE</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Main Content Area */}
+                <div className="flex-1 flex flex-col overflow-hidden relative">
+                    
+                    {/* Header */}
+                    <header className="h-16 flex items-center justify-between px-8 glass-panel m-4 rounded-lg interactive">
+                        <h2 className="text-xl font-sci-fi tracking-wide">{activeTab.toUpperCase()} OVERVIEW</h2>
+                        <div className="flex items-center space-x-4">
+                            <span className="font-mono text-xs text-neon-blue opacity-70">LAT: 45.203 | LON: -12.004</span>
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-neon-blue to-purple-600 border border-white/20"></div>
+                        </div>
+                    </header>
+
+                    {/* Dashboard Grid */}
+                    <main className="flex-1 p-4 pt-0 overflow-y-auto interactive">
+                        {activeTab === 'dashboard' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 h-full pb-4">
+                                
+                                {/* Stat Cards */}
+                                <div className="glass-panel p-6 rounded-xl flex flex-col justify-between hover:bg-white/5 transition duration-300 group" onMouseEnter={handleHover}>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="text-gray-400 text-sm font-mono">ACTIVE USERS</p>
+                                            <h3 className="text-4xl font-sci-fi font-bold mt-2 group-hover:text-neon-blue transition-colors">24,592</h3>
+                                        </div>
+                                        <div className="p-2 bg-neon-blue/10 rounded-lg text-neon-blue">
+                                            <Icon name="users" className="w-6 h-6" />
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 w-full bg-gray-700 h-1 rounded-full overflow-hidden">
+                                        <div className="bg-neon-blue h-full w-[75%] shadow-[0_0_10px_rgba(0,243,255,0.7)]"></div>
+                                    </div>
+                                </div>
+
+                                <div className="glass-panel p-6 rounded-xl flex flex-col justify-between hover:bg-white/5 transition duration-300 group" onMouseEnter={handleHover}>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="text-gray-400 text-sm font-mono">SYSTEM LOAD</p>
+                                            <h3 className="text-4xl font-sci-fi font-bold mt-2 group-hover:text-neon-purple transition-colors">88%</h3>
+                                        </div>
+                                        <div className="p-2 bg-neon-purple/10 rounded-lg text-neon-purple">
+                                            <Icon name="cpu" className="w-6 h-6" />
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 flex space-x-1">
+                                        {[...Array(10)].map((_, i) => (
+                                            <div key={i} className={`h-8 flex-1 rounded-sm ${i < 8 ? 'bg-neon-purple/80' : 'bg-gray-800'}`}></div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* AI Chat Interface */}
+                                <div className="glass-panel rounded-xl row-span-2 flex flex-col animate-pulse-border">
+                                    <div className="p-4 border-b border-white/10 bg-white/5">
+                                        <h3 className="font-sci-fi font-bold flex items-center">
+                                            <span className="w-2 h-2 bg-neon-blue rounded-full mr-2 animate-ping"></span>
+                                            AI ASSISTANT
+                                        </h3>
+                                    </div>
+                                    <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                                        {messages.map((msg) => (
+                                            <div key={msg.id} className={`flex ${msg.sender === 'User' ? 'justify-end' : 'justify-start'}`}>
+                                                <div className={`max-w-[80%] p-3 rounded-lg text-sm ${msg.sender === 'User' ? 'bg-neon-blue/20 text-white border border-neon-blue/30' : 'bg-gray-800/50 text-gray-300'}`}>
+                                                    <p>{msg.text}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <form onSubmit={sendMessage} className="p-4 border-t border-white/10 flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            value={inputText}
+                                            onChange={(e) => setInputText(e.target.value)}
+                                            placeholder="Enter command..."
+                                            className="flex-1 bg-black/30 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-neon-blue/50 transition-colors"
+                                        />
+                                        <button type="submit" className="p-2 bg-neon-blue/20 rounded-lg hover:bg-neon-blue/40 text-neon-blue transition-colors">
+                                            <Icon name="send" className="w-5 h-5" />
+                                        </button>
+                                    </form>
+                                </div>
+
+                                {/* Large Data Visualization Panel Placeholder */}
+                                <div className="glass-panel p-6 rounded-xl md:col-span-2 min-h-[200px] relative overflow-hidden group" onMouseEnter={handleHover}>
+                                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-transparent to-black/80 pointer-events-none z-0"></div>
+                                    <div className="relative z-10">
+                                        <h3 className="text-lg font-sci-fi mb-2">TOPOLOGY METRICS</h3>
+                                        <p className="text-xs text-gray-400 mb-6 max-w-sm">
+                                            The terrain behind this panel represents real-time data flow. Peaks indicate high traffic volume, valleys represent idle states.
+                                        </p>
+                                        <button className="px-6 py-2 border border-neon-blue text-neon-blue text-xs font-bold tracking-wider rounded hover:bg-neon-blue hover:text-black transition-all duration-300" onClick={handleClick}>
+                                            REFRESH TERRAIN
+                                        </button>
+                                    </div>
+                                    {/* Visual flair elements */}
+                                    <div className="absolute bottom-4 right-4 flex space-x-2">
+                                        <div className="text-[0.6rem] font-mono text-neon-blue/50">DATA_STREAM_01</div>
+                                        <div className="text-[0.6rem] font-mono text-white/50">SYNCED</div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        )}
+                        
+                        {/* Placeholder for other tabs */}
+                        {activeTab !== 'dashboard' && (
+                            <div className="h-full flex items-center justify-center glass-panel rounded-xl">
+                                <div className="text-center">
+                                    <Icon name={activeTab === 'analytics' ? 'cpu' : 'users'} className="w-16 h-16 mx-auto text-gray-600 mb-4" />
+                                    <h2 className="text-2xl font-sci-fi text-gray-400">MODULE OFFLINE</h2>
+                                    <p className="text-sm text-gray-500 mt-2">Requires Level 5 Security Clearance</p>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+
+                {/* Overlay Vignette for cinematic effect */}
+                <div className="fixed inset-0 pointer-events-none z-0 shadow-[inset_0_0_100px_rgba(0,0,0,0.9)]"></div>
+            </div>
+        );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('ui-root'));
+    root.render(<App />);
+
+</script>
+</body>
+</html>
