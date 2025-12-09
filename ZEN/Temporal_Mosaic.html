@@ -1,0 +1,334 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { 
+  Clock, 
+  Mail, 
+  MessageSquare, 
+  Zap, 
+  Calendar, 
+  Activity, 
+  TrendingUp, 
+  AlertCircle,
+  Coffee,
+  Brain,
+  Layers,
+  Search
+} from 'lucide-react';
+
+/**
+ * MOCK DATA & UTILITIES
+ * Simulates the "Sentient AI" backend inputs
+ */
+
+const INITIAL_ITEMS = [
+  { id: '1', title: 'Deep Work Session', type: 'focus', icon: Brain, urgency: 0.2, category: 'work' },
+  { id: '2', title: 'Q3 Financial Review', type: 'meeting', icon: TrendingUp, urgency: 0.8, category: 'finance' },
+  { id: '3', title: 'Team Sync', type: 'meeting', icon: MessageSquare, urgency: 0.6, category: 'work' },
+  { id: '4', title: 'System Health', type: 'system', icon: Activity, urgency: 0.1, category: 'tech' },
+  { id: '5', title: 'Urgent: Server Load', type: 'alert', icon: AlertCircle, urgency: 0.95, category: 'tech' },
+  { id: '6', title: 'Client Email', type: 'comms', icon: Mail, urgency: 0.4, category: 'work' },
+  { id: '7', title: 'Design Huddle', type: 'meeting', icon: Layers, urgency: 0.3, category: 'design' },
+  { id: '8', title: 'Coffee Break', type: 'health', icon: Coffee, urgency: 0.5, category: 'personal' },
+  { id: '9', title: 'Project Timeline', type: 'planning', icon: Calendar, urgency: 0.2, category: 'work' },
+];
+
+// Utility to map urgency (0-1) to a size class
+const getSizeFromUrgency = (urgency, isFocused) => {
+  if (isFocused) return 'col-span-2 row-span-2 md:col-span-3 md:row-span-2'; // Full focus
+  if (urgency > 0.8) return 'col-span-2 row-span-2'; // Critical
+  if (urgency > 0.5) return 'col-span-1 row-span-2'; // High Priority/Tall
+  if (urgency > 0.3) return 'col-span-2 row-span-1'; // Wide context
+  return 'col-span-1 row-span-1'; // Standard
+};
+
+// Utility to get border/glow color based on urgency/time
+const getVisualsFromUrgency = (urgency) => {
+  if (urgency > 0.8) return {
+    border: 'border-rose-500/50',
+    glow: 'shadow-[0_0_30px_-5px_rgba(244,63,94,0.4)]',
+    gradient: 'from-rose-500/20 to-orange-600/20',
+    text: 'text-rose-100'
+  };
+  if (urgency > 0.5) return {
+    border: 'border-amber-400/40',
+    glow: 'shadow-[0_0_20px_-5px_rgba(251,191,36,0.3)]',
+    gradient: 'from-amber-500/10 to-orange-500/10',
+    text: 'text-amber-100'
+  };
+  return {
+    border: 'border-indigo-400/30',
+    glow: 'shadow-[0_0_15px_-5px_rgba(99,102,241,0.2)]',
+    gradient: 'from-indigo-500/10 to-blue-600/10',
+    text: 'text-indigo-100'
+  };
+};
+
+/**
+ * COMPONENT: Temporal Tile
+ */
+const TemporalTile = ({ item, isFocused, onClick }) => {
+  const visuals = getVisualsFromUrgency(item.urgency);
+  const sizeClass = getSizeFromUrgency(item.urgency, isFocused);
+  
+  // Calculate a "pulse" duration based on urgency (higher urgency = faster pulse)
+  const pulseDuration = `${3 - (item.urgency * 2)}s`;
+
+  return (
+    <div 
+      onClick={() => onClick(item.id)}
+      className={`
+        relative overflow-hidden rounded-3xl backdrop-blur-xl border transition-all duration-1000 ease-in-out cursor-pointer group
+        bg-slate-900/40 hover:bg-slate-800/50
+        ${sizeClass}
+        ${visuals.border}
+        ${isFocused ? 'z-50 scale-[1.02]' : 'z-10 hover:scale-[1.01]'}
+        ${visuals.glow}
+      `}
+      style={{
+        transitionProperty: 'all',
+        transitionDuration: '1.2s', // Slow, fluid movement
+        transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)', // Smooth ease
+      }}
+    >
+      {/* Dynamic Background Gradient */}
+      <div 
+        className={`absolute inset-0 bg-gradient-to-br ${visuals.gradient} opacity-50 transition-opacity duration-1000`} 
+      />
+      
+      {/* Animated Time-Pulse Border */}
+      <div 
+        className="absolute inset-0 opacity-20 pointer-events-none"
+        style={{
+          boxShadow: `inset 0 0 40px ${item.urgency > 0.7 ? 'red' : 'blue'}`,
+          animation: `pulse ${pulseDuration} infinite ease-in-out`
+        }}
+      />
+
+      {/* Content Container */}
+      <div className="relative h-full p-6 flex flex-col justify-between">
+        
+        {/* Header */}
+        <div className="flex justify-between items-start">
+          <div className={`p-2 rounded-full bg-white/5 border border-white/10 ${visuals.text}`}>
+            <item.icon size={isFocused ? 24 : 18} />
+          </div>
+          {item.urgency > 0.7 && (
+            <span className="text-xs font-mono uppercase tracking-widest text-rose-400 animate-pulse">
+              Prioritized
+            </span>
+          )}
+        </div>
+
+        {/* Body */}
+        <div className="space-y-2">
+          <h3 className={`font-medium tracking-tight transition-all duration-500 ${isFocused ? 'text-3xl' : 'text-lg'} text-white`}>
+            {item.title}
+          </h3>
+          
+          {/* Context lines only visible when large or focused */}
+          {(getSizeFromUrgency(item.urgency, isFocused).includes('span-2') || isFocused) && (
+            <p className="text-slate-400 text-sm leading-relaxed opacity-0 animate-fadeIn" style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}>
+              Soft AI inference suggests this requires attention based on your typical {new Date().toLocaleDateString('en-US', { weekday: 'long' })} workflow patterns.
+            </p>
+          )}
+        </div>
+
+        {/* Footer / Meta */}
+        <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
+          <span>{item.category.toUpperCase()}</span>
+          <div className="flex items-center gap-2">
+             <div className="h-1 w-16 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-current transition-all duration-1000"
+                  style={{ width: `${item.urgency * 100}%`, color: item.urgency > 0.6 ? '#f43f5e' : '#6366f1' }}
+                />
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * MAIN APP COMPONENT
+ */
+const App = () => {
+  const [items, setItems] = useState(INITIAL_ITEMS);
+  const [focusedId, setFocusedId] = useState(null);
+  const [clock, setClock] = useState(new Date());
+  const [isSimulating, setIsSimulating] = useState(true);
+
+  // Simulation Loop: The "Soft AI" Engine
+  useEffect(() => {
+    if (!isSimulating) return;
+
+    const interval = setInterval(() => {
+      setItems(currentItems => {
+        // 1. subtle random shifts in urgency
+        const newItems = currentItems.map(item => {
+          // Add random noise to urgency (-0.05 to +0.05)
+          let drift = (Math.random() - 0.5) * 0.1;
+          
+          // Time-based bias: Increase urgency for specific types based on seconds
+          const second = new Date().getSeconds();
+          if (second < 20 && item.category === 'work') drift += 0.05;
+          if (second > 40 && item.category === 'personal') drift += 0.05;
+
+          // Clamp between 0.05 and 0.95
+          let newUrgency = Math.max(0.05, Math.min(0.95, item.urgency + drift));
+          
+          // Pattern Match: Occasionally spike a random item to simulate an "event"
+          if (Math.random() > 0.98) {
+            newUrgency = 0.95; // Sudden priority
+          }
+
+          return { ...item, urgency: newUrgency };
+        });
+
+        // 2. Sort by urgency for the "Living Map" effect
+        // We sort so that high urgency items naturally flow to the top/left
+        return newItems.sort((a, b) => b.urgency - a.urgency);
+      });
+      
+      setClock(new Date());
+    }, 3000); // Update every 3 seconds for a slow, breathing rhythm
+
+    return () => clearInterval(interval);
+  }, [isSimulating]);
+
+  // Handle click to focus/unfocus
+  const handleTileClick = useCallback((id) => {
+    setFocusedId(prev => prev === id ? null : id);
+  }, []);
+
+  // Reset urgency on an item (simulating "Done")
+  const resolveItem = (e, id) => {
+    e.stopPropagation();
+    setItems(prev => prev.map(item => 
+      item.id === id ? { ...item, urgency: 0.1 } : item
+    ));
+    setFocusedId(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-200 overflow-x-hidden relative font-sans selection:bg-indigo-500/30">
+      
+      {/* GLOBAL STYLES & ANIMATIONS */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.1; }
+          50% { opacity: 0.3; }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(5px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { bg: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+      `}</style>
+
+      {/* AMBIENT BACKGROUND */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-900/20 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '8s' }} />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-rose-900/10 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '10s', animationDelay: '1s' }} />
+        <div className="absolute top-[40%] left-[40%] w-[30%] h-[30%] bg-cyan-900/10 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '12s', animationDelay: '2s' }} />
+        
+        {/* Subtle Grid Overlay */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-20" />
+      </div>
+
+      {/* HEADER / HUD */}
+      <header className="fixed top-0 left-0 right-0 z-40 px-8 py-6 flex justify-between items-center bg-gradient-to-b from-slate-950 via-slate-950/80 to-transparent backdrop-blur-sm">
+        <div className="flex flex-col">
+          <h1 className="text-2xl font-light tracking-tight text-white flex items-center gap-3">
+            <Zap className="text-amber-400 fill-amber-400/20" size={20} />
+            Temporal Mosaic
+          </h1>
+          <span className="text-xs font-mono text-slate-500 mt-1 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            LIVE INFERENCE ACTIVE
+          </span>
+        </div>
+
+        <div className="flex items-center gap-6">
+          <div className="text-right hidden sm:block">
+            <div className="text-2xl font-light tabular-nums tracking-wider text-slate-300">
+              {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+            <div className="text-xs text-slate-500 uppercase tracking-widest">
+              {clock.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
+            </div>
+          </div>
+          
+          <button 
+            onClick={() => setIsSimulating(!isSimulating)}
+            className="p-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+            title={isSimulating ? "Pause Inference" : "Resume Inference"}
+          >
+             {isSimulating ? <Activity size={20} className="text-emerald-400" /> : <Activity size={20} className="text-slate-500" />}
+          </button>
+        </div>
+      </header>
+
+      {/* MAIN MOSAIC GRID */}
+      <main className="relative z-10 container mx-auto px-4 pt-32 pb-20">
+        
+        {/* Search / Filter Bar (Visual only for aesthetic) */}
+        <div className="mb-8 flex items-center gap-4 px-2 opacity-60">
+           <div className="relative flex-1 max-w-md">
+             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+             <input 
+              type="text" 
+              placeholder="Filter temporal stream..." 
+              className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-slate-300 focus:outline-none focus:border-indigo-500/50 transition-colors"
+             />
+           </div>
+           <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+        </div>
+
+        {/* The Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 auto-rows-[180px]">
+          {items.map((item) => (
+            <TemporalTile 
+              key={item.id} 
+              item={item} 
+              isFocused={focusedId === item.id}
+              onClick={handleTileClick}
+            />
+          ))}
+        </div>
+
+      </main>
+
+      {/* BOTTOM ACTION BAR (Contextual) */}
+      <div 
+        className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ease-out ${focusedId ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}
+      >
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-full px-6 py-3 shadow-2xl flex items-center gap-4">
+          <span className="text-sm text-slate-400 font-medium">Action:</span>
+          <button 
+            onClick={(e) => resolveItem(e, focusedId)}
+            className="px-4 py-1.5 rounded-full bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium transition-colors"
+          >
+            Mark Complete
+          </button>
+          <button 
+            onClick={() => setFocusedId(null)}
+            className="px-4 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-slate-300 text-sm font-medium transition-colors"
+          >
+            Defer 1h
+          </button>
+        </div>
+      </div>
+
+    </div>
+  );
+};
+
+export default App;
