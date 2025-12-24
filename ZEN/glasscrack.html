@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Holographic Glass Interface - ZenAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --neon-blue: #00f3ff;
+            --neon-pink: #bc13fe;
+            --neon-gold: #ffd700;
+            --neon-red: #ff2a2a;
+        }
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #050505;
+            background-image: 
+                radial-gradient(circle at 50% 50%, #111 0%, #000 100%),
+                linear-gradient(0deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            perspective: 1500px;
+        }
+
+        /* --- CONTAINER --- */
+        .glass-pod {
+            width: 22rem;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 3rem;
+            padding: 4px;
+            box-shadow: 
+                0 0 0 1px var(--glass-border),
+                0 20px 50px -10px rgba(0,0,0,0.8),
+                inset 0 0 20px rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.1s ease-out;
+            user-select: none;
+        }
+
+        /* --- PANELS --- */
+        .glass-panel {
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            
+            /* Glass properties */
+            background: rgba(255, 255, 255, 0.02);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+            
+            --opacity: 0;
+            --crack-color: 255, 255, 255; /* RGB values for JS */
+        }
+
+        /* --- PROCEDURAL CRACKS CANVAS --- */
+        .cracks-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            mix-blend-mode: screen;
+            z-index: 5;
+            opacity: 0.9;
+        }
+
+        /* --- EXTREME GLOW --- */
+        .glow-layer {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(
+                300px circle at var(--mouse-x) var(--mouse-y), 
+                var(--glow-color),
+                transparent 60%
+            );
+            opacity: var(--opacity);
+            mix-blend-mode: screen;
+            pointer-events: none;
+            z-index: 1;
+            filter: blur(20px);
+            transition: opacity 0.2s ease;
+        }
+
+        /* --- HOLOGRAPHIC TEXT --- */
+        .panel-content {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transform: translateZ(10px);
+            pointer-events: none;
+        }
+
+        .icon-box {
+            font-size: 1.5rem;
+            color: rgba(255,255,255,0.7);
+            text-shadow: 0 0 5px rgba(255,255,255,0.3);
+            transition: all 0.3s;
+        }
+
+        .holo-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .text-main {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.2rem;
+            color: rgba(255,255,255,0.9);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            position: relative;
+        }
+        
+        .text-sub {
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.5);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        /* Hologram Glitch Effect on Hover */
+        .glass-panel:hover .text-main {
+            text-shadow: 
+                2px 0 var(--neon-red), 
+                -2px 0 var(--neon-blue);
+            animation: holo-flicker 0.1s infinite alternate;
+            color: #fff;
+        }
+        
+        .glass-panel:hover .icon-box {
+            color: #fff;
+            filter: drop-shadow(0 0 8px var(--glow-color));
+            transform: scale(1.1);
+        }
+
+        @keyframes holo-flicker {
+            0% { opacity: 1; transform: skewX(0deg); }
+            20% { opacity: 0.8; transform: skewX(-2deg); }
+            40% { opacity: 1; transform: skewX(2deg); }
+            60% { opacity: 0.9; transform: skewX(0deg); }
+            100% { opacity: 1; transform: skewX(0deg); }
+        }
+
+        /* --- PANEL SPECIFICS --- */
+        
+        /* TOP: PRISM / GOLD */
+        .panel-top {
+            height: 6rem;
+            width: 100%;
+            border-radius: 2.5rem 2.5rem 0.5rem 0.5rem;
+            --glow-color: rgba(255, 215, 0, 0.6);
+            --crack-color: 255, 215, 0; /* Gold */
+        }
+        
+        /* LEFT: CYAN */
+        .panel-left {
+            width: 50%;
+            border-radius: 0.5rem 0.5rem 0.5rem 2.5rem;
+            --glow-color: rgba(0, 243, 255, 0.6);
+            --crack-color: 0, 243, 255; /* Cyan */
+        }
+
+        /* RIGHT: MAGENTA/RED */
+        .panel-right {
+            width: 50%;
+            border-radius: 0.5rem 0.5rem 2.5rem 0.5rem;
+            --glow-color: rgba(255, 42, 42, 0.6);
+            --crack-color: 255, 42, 42; /* Red */
+        }
+
+        /* --- BASE ROW --- */
+        .pod-base {
+            display: flex;
+            width: 100%;
+            height: 7rem;
+            gap: 4px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="glass-pod" id="glassPod">
+        
+        <!-- TOP: AI LITERACY -->
+        <a href="#" class="glass-panel panel-top group no-underline">
+            <div class="glow-layer"></div>
+            <canvas class="cracks-canvas"></canvas>
+            
+            <div class="panel-content">
+                <i class="icon-box fa-solid fa-graduation-cap"></i>
+                <div class="holo-text">
+                    <span class="text-main">AI LITERACY</span>
+                    <span class="text-sub">ACCESS KNOWLEDGE //</span>
+                </div>
+            </div>
+        </a>
+
+        <div class="pod-base">
+            <!-- LEFT: ZENAI WORLD -->
+            <a href="https://zenai.world" target="_blank" class="glass-panel panel-left group no-underline">
+                <div class="glow-layer"></div>
+                <canvas class="cracks-canvas"></canvas>
+
+                <div class="panel-content flex-col gap-2">
+                    <i class="icon-box fa-solid fa-earth-americas text-2xl"></i>
+                    <div class="holo-text items-center">
+                        <span class="text-main text-lg">ZENAI</span>
+                        <span class="text-sub">GLOBAL NETWORK</span>
+                    </div>
+                </div>
+            </a>
+
+            <!-- RIGHT: AI ARENA -->
+            <a href="https://us.zenai.biz" target="_blank" class="glass-panel panel-right group no-underline">
+                <div class="glow-layer"></div>
+                <canvas class="cracks-canvas"></canvas>
+
+                <div class="panel-content flex-col gap-2">
+                    <i class="icon-box fa-solid fa-gamepad text-2xl"></i>
+                    <div class="holo-text items-center">
+                        <span class="text-main text-lg">ARENA</span>
+                        <span class="text-sub">COMBAT SIM</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+    </div>
+
+    <script>
+        const pod = document.getElementById('glassPod');
+        const panels = document.querySelectorAll('.glass-panel');
+
+        // --- 1. PROCEDURAL CRACKS ENGINE ---
+        function drawLightning(ctx, startX, startY, colorRGB) {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            
+            // Set styles for "fine cracks"
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = `rgb(${colorRGB})`;
+            ctx.strokeStyle = `rgba(${colorRGB}, 0.9)`;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+
+            // Generate 3-5 main branches
+            const branches = 3 + Math.floor(Math.random() * 3);
+            
+            for (let i = 0; i < branches; i++) {
+                // Random angle but generally spreading out
+                const angle = (Math.PI * 2 / branches) * i + (Math.random() * 0.5 - 0.25);
+                const length = 50 + Math.random() * 80;
+                drawBranch(ctx, startX, startY, angle, length, 3, colorRGB);
+            }
+        }
+
+        function drawBranch(ctx, x, y, angle, length, depth, colorRGB) {
+            if (depth <= 0 || length < 2) return;
+
+            // Varying line width for "organic" feel
+            ctx.lineWidth = 0.5 + Math.random() * 1; 
+
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+
+            let currentX = x;
+            let currentY = y;
+            let remainingLength = length;
+            
+            // Draw jagged segments
+            while (remainingLength > 0) {
+                const segLen = 2 + Math.random() * 6; // Short segments for jaggedness
+                const usedLen = Math.min(segLen, remainingLength);
+                
+                // Jitter the angle
+                const deviation = (Math.random() - 0.5) * 1.2; 
+                
+                currentX += Math.cos(angle + deviation) * usedLen;
+                currentY += Math.sin(angle + deviation) * usedLen;
+                
+                ctx.lineTo(currentX, currentY);
+                remainingLength -= usedLen;
+
+                // Chance to fork
+                if (Math.random() > 0.7 && depth > 0) {
+                    drawBranch(ctx, currentX, currentY, angle + (Math.random() - 0.5), length * 0.5, depth - 1, colorRGB);
+                    // Reset path for current branch after returning from recursion
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(currentX, currentY);
+                }
+            }
+            ctx.stroke();
+        }
+
+        // --- 2. INITIALIZATION & EVENTS ---
+        
+        panels.forEach(panel => {
+            const canvas = panel.querySelector('.cracks-canvas');
+            const ctx = canvas.getContext('2d');
+            let animationFrame;
+
+            // Resize Observer to handle canvas resolution
+            const resizeCanvas = () => {
+                const rect = panel.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+            };
+            
+            // Init resize
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            // Mouse Move Handler
+            panel.addEventListener('mousemove', (e) => {
+                const rect = panel.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // CSS Vars for Glow
+                panel.style.setProperty('--mouse-x', `${x}px`);
+                panel.style.setProperty('--mouse-y', `${y}px`);
+
+                // Proximity Opacity
+                const distToPanel = Math.hypot(
+                    e.clientX - (rect.left + rect.width/2),
+                    e.clientY - (rect.top + rect.height/2)
+                );
+                let opacity = 1 - Math.min(distToPanel / 300, 1);
+                panel.style.setProperty('--opacity', opacity);
+
+                // DRAW CRACKS
+                // Get color from style (computed) or default
+                const colorVar = getComputedStyle(panel).getPropertyValue('--crack-color').trim();
+                
+                // We redraw every frame mouse moves for "always different" energetic feel
+                // Or we can throttle it if it's too chaotic. Let's keep it chaotic for "energy".
+                drawLightning(ctx, x, y, colorVar);
+            });
+
+            // Mouse Leave Handler
+            panel.addEventListener('mouseleave', () => {
+                panel.style.setProperty('--opacity', '0');
+                // Clear cracks instantly on leave
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            });
+        });
+
+        // --- 3. 3D TILT LOGIC (Global) ---
+        document.addEventListener('mousemove', (e) => {
+            const podRect = pod.getBoundingClientRect();
+            const podCenterX = podRect.left + podRect.width / 2;
+            const podCenterY = podRect.top + podRect.height / 2;
+            
+            const xPct = (e.clientX - podCenterX) / (window.innerWidth / 2);
+            const yPct = (e.clientY - podCenterY) / (window.innerHeight / 2);
+            
+            const tiltX = yPct * -10;
+            const tiltY = xPct * 10;
+            pod.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+        });
+
+        document.addEventListener('mouseleave', () => {
+            pod.style.transform = `rotateX(0deg) rotateY(0deg)`;
+        });
+    </script>
+</body>
+</html>
