@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEAR Wallet Connector</title>
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap"
+  />
+  <style>
+    * {
+      font-family: Manrope, sans-serif;
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      gap: 24px;
+      background-color: #f4f4f4;
+    }
+
+    h1 {
+      text-align: center;
+      margin: 0;
+    }
+
+    .here-button {
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px 16px;
+      min-width: 180px;
+      background: #f7b302;
+      height: 48px;
+      border: 1px solid #2c3034;
+      box-shadow: 4px 4px 0px #2c3034;
+      border-radius: 16px;
+      font-weight: 800;
+      font-size: 16px;
+      color: #2c3034;
+      text-decoration: none;
+      transition: 0.2s background, 0.1s transform, 0.1s box-shadow;
+      margin: 4px;
+    }
+
+    .here-button:hover:not(:disabled) {
+      background: #ffcc4a;
+      transform: translateY(-1px);
+      box-shadow: 5px 5px 0px #2c3034;
+    }
+
+    .here-button:disabled {
+      cursor: default;
+      background: #f6bf4c;
+      opacity: 0.7;
+    }
+
+    #status {
+      font-size: 1.0em;
+      color: #2c3034;
+      margin-top: 10px;
+      text-align: center;
+      max-width: 480px;
+      line-height: 1.4;
+    }
+
+    .wallet-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .subtext {
+      font-size: 0.9em;
+      color: #555;
+      max-width: 520px;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <h1 id="account-id">Connect Your NEAR Wallet</h1>
+
+  <div class="wallet-row">
+    <!-- Main connect button using near-api-js (MyNearWallet / legacy NEAR Wallet) -->
+    <button class="here-button" id="connect">
+      Connect NEAR Wallet
+    </button>
+
+    <!-- Just an extra shortcut: opens HERE Wallet mining village (your link) in a new tab -->
+    <a
+      class="here-button"
+      id="open-here"
+      href="https://t.me/herewalletbot/app?startapp=4226714-village-100650"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      Open HERE Wallet
+    </a>
+  </div>
+
+  <button class="here-button" id="verify-connect" style="display: none;">
+    Verify NEARNVIDIA Balance
+  </button>
+
+  <div id="status"></div>
+
+  <p class="subtext">
+    This connector signs in with a NEAR wallet and then checks your
+    <strong>NEARNVIDIA</strong> fungible token balance on mainnet.
+  </p>
+
+  <!-- near-api-js -->
+  <script src="https://cdn.jsdelivr.net/npm/near-api-js@0.41.0/dist/near-api-js.min.js"></script>
+  <script>
+    const { connect, WalletConnection, keyStores, Contract } = window.nearApi;
+
+    // --- CONFIG: adjust these if needed ---
+    const NETWORK_ID = "mainnet";
+    const NODE_URL = "https://rpc.mainnet.near.org";
+    const WALLET_URL = "https://app.mynearwallet.com"; // modern NEAR wallet frontend
+    const HELPER_URL = "https://helper.mainnet.near.org";
+    const EXPLORER_URL = "https://explorer.mainnet.near.org";
+
+    const TOKEN_CONTRACT_ID = "nearnvidia.near"; // FT contract
+    const REQUIRED_TOKENS = 500n; // you want 500 NEARNVIDIA
+    const TOKEN_DECIMALS = 24n; // most NEP-141 FTs use 24; change if NEARNVIDIA differs
+
+    async function initNear() {
+      const config = {
+        networkId: NETWORK_ID,
+        keyStore: new keyStores.BrowserLocalStorageKeyStore(),
+        nodeUrl: NODE_URL,
+        walletUrl: WALLET_URL,
+        helperUrl: HELPER_URL,
+        explorerUrl: EXPLORER_URL,
+      };
+
+      const near = await connect(config);
+      const wallet = new WalletConnection(near, "zen-here-wallet-connector");
+
+      return { near, wallet };
+    }
+
+    /**
+     * Read FT balance for the given account and contract.
+     * Uses NEP-141 `ft_balance_of` view method.
+     */
+    async function checkTokenBalance(wallet, accountId, tokenContract) {
+      const account = wallet.account();
+
+      const contract = new Contract(account, tokenContract, {
+        viewMethods: ["ft_balance_of"],
+        changeMethods: [],
+      });
+
+      const rawBalance = await contract.ft_balance_of({ account_id: accountId });
+      // rawBalance is a decimal string in smallest units, e.g. "5000000..."
+      return rawBalance;
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      const connectButton = document.getElementById("connect");
+      const verifyButton = document.getElementById("verify-connect");
+      const accountIdDisplay = document.getElementById("account-id");
+      const statusDisplay = document.getElementById("status");
+
+      let wallet;
+      let currentAccountId = null;
+
+      try {
+        const init = await initNear();
+        wallet = init.wallet;
+        window.walletConnection = wallet; // optional, but keeps compatibility with other scripts
+      } catch (err) {
+        console.error("Failed to init NEAR:", err);
+        statusDisplay.innerText =
+          "Error initializing NEAR connection. Check RPC / network config.";
+        connectButton.disabled = true;
+        return;
+      }
+
+      async function handleSignedIn(accountId) {
+        currentAccountId = accountId;
+        accountIdDisplay.innerText = `Connected: ${accountId}`;
+        connectButton.style.display = "none";
+        verifyButton.style.display = "inline-flex";
+        statusDisplay.innerText =
+          "Wallet connected. You can now verify your NEARNVIDIA balance.";
+      }
+
+      // If already signed in, show verify button immediately.
+      if (wallet.isSignedIn()) {
+        const accountId = wallet.getAccountId();
+        await handleSignedIn(accountId);
+      }
+
+      // Connect button
+      connectButton.addEventListener("click", async () => {
+        try {
+          // You can optionally pass a contractId + successUrl/failureUrl if you want
+          wallet.requestSignIn(); // generic sign-in to NEAR wallet
+        } catch (err) {
+          console.error("Sign-in error:", err);
+          statusDisplay.innerText = "Failed to open wallet sign-in.";
+        }
+      });
+
+      // Verify button
+      verifyButton.addEventListener("click", async () => {
+        if (!wallet || !wallet.isSignedIn() || !currentAccountId) {
+          statusDisplay.innerText =
+            "You must connect a NEAR wallet before verifying.";
+          return;
+        }
+
+        statusDisplay.innerText = "Checking NEARNVIDIA token balance on-chain...";
+
+        try {
+          const rawBalance = await checkTokenBalance(
+            wallet,
+            currentAccountId,
+            TOKEN_CONTRACT_ID
+          );
+
+          // Convert using decimals (BigInt math)
+          const rawBig = BigInt(rawBalance);
+          const requiredRaw = REQUIRED_TOKENS * 10n ** TOKEN_DECIMALS;
+
+          const hasEnough = rawBig >= requiredRaw;
+
+          // Nice human-readable number
+          const humanBalance = Number(
+            rawBig / 10n ** TOKEN_DECIMALS
+          ).toLocaleString();
+
+          if (hasEnough) {
+            statusDisplay.innerText =
+              `✅ Verification successful: ${currentAccountId} holds ` +
+              `${humanBalance}+ NEARNVIDIA (≥ ${REQUIRED_TOKENS.toString()}).`;
+          } else {
+            statusDisplay.innerText =
+              `❌ Verification failed: ${currentAccountId} holds ` +
+              `${humanBalance} NEARNVIDIA, which is less than ` +
+              `${REQUIRED_TOKENS.toString()}.`;
+          }
+        } catch (err) {
+          console.error("Verification error:", err);
+          statusDisplay.innerText =
+            "Error while fetching token balance. Check the token contract ID and network.";
+        }
+      });
+    });
+  </script>
+</body>
+
+</html>
+<!--HTTPS only...-->
