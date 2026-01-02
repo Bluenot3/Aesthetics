@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <title>ZEN AI - Neuro-Lightning Interface [Ultra]</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --neon-cyan: #22d3ee;
+            --neon-magenta: #e879f9;
+            --neon-violet: #8b5cf6;
+            --deep-void: #020617;
+            --text-outline: #000000;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            display: grid;
+            place-items: center;
+            background: transparent;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+        }
+
+        /* --- Compact Prism Container --- */
+        .prism-card {
+            position: relative;
+            width: 280px;
+            height: 70px;
+            border-radius: 12px;
+            text-decoration: none;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            /* Default Aura - Visible on dark backgrounds */
+            box-shadow: 
+                0 0 20px -5px rgba(34, 211, 238, 0.15),
+                0 0 12px -2px rgba(139, 92, 246, 0.1); 
+            transform-style: preserve-3d;
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s ease, border-color 0.4s ease;
+            background: var(--deep-void);
+            isolation: isolate;
+            /* Sharper, brighter border for visibility */
+            border: 1px solid rgba(255,255,255,0.2); 
+        }
+        
+        .prism-card:hover {
+            box-shadow: 
+                0 20px 50px -10px rgba(6, 182, 212, 0.3),
+                0 0 25px 0px rgba(232, 121, 249, 0.2);
+            border-color: rgba(255,255,255,0.4);
+        }
+
+        /* --- Layer 1: The Plasma Canvas (Soft Background) --- */
+        #plasma-canvas {
+            position: absolute;
+            inset: -30px; 
+            width: calc(100% + 60px);
+            height: calc(100% + 60px);
+            z-index: 1;
+            opacity: 0.85; /* Increased visibility */
+            /* Infinite color shift animation */
+            animation: idleHueShift 15s linear infinite;
+            will-change: transform, filter;
+        }
+
+        @keyframes idleHueShift {
+            0% { filter: blur(12px) contrast(1.25) saturate(1.3) hue-rotate(0deg); }
+            50% { filter: blur(12px) contrast(1.25) saturate(1.3) hue-rotate(180deg); }
+            100% { filter: blur(12px) contrast(1.25) saturate(1.3) hue-rotate(360deg); }
+        }
+
+        /* --- Layer 2: The Lightning Canvas (Sharp Details) --- */
+        #lightning-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3; 
+            pointer-events: none;
+            filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.6)); 
+        }
+
+        /* --- Layer 3: Tech Grid Overlay --- */
+        .tech-mesh {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            background-size: 14px 14px;
+            background-image: 
+                linear-gradient(to right, rgba(255,255,255,0.05) 0.5px, transparent 0.5px),
+                linear-gradient(to bottom, rgba(255,255,255,0.05) 0.5px, transparent 0.5px);
+            mix-blend-mode: overlay;
+            pointer-events: none;
+        }
+
+        /* --- Layer 4: Glass Surface --- */
+        .glass-surface {
+            position: absolute;
+            inset: 0;
+            z-index: 4;
+            background: linear-gradient(
+                180deg, 
+                rgba(255, 255, 255, 0.15) 0%, 
+                rgba(255, 255, 255, 0.0) 40%, 
+                rgba(255, 255, 255, 0.0) 60%, 
+                rgba(255, 255, 255, 0.15) 100%
+            );
+            box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.1);
+            transition: all 0.5s ease;
+        }
+        
+        .prism-card:hover .glass-surface {
+            background: linear-gradient(
+                180deg, 
+                rgba(255, 255, 255, 0.2) 0%, 
+                rgba(255, 255, 255, 0.0) 40%, 
+                rgba(255, 255, 255, 0.0) 60%, 
+                rgba(255, 255, 255, 0.2) 100%
+            );
+            box-shadow: inset 0 0 30px rgba(34, 211, 238, 0.15), inset 0 0 0 0.5px rgba(255,255,255,0.3);
+        }
+
+        /* --- Content & Typography --- */
+        .content {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            transform: translateZ(30px);
+            pointer-events: none; 
+        }
+
+        .label-top {
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 10px;
+            letter-spacing: 0.8em; 
+            color: #cbd5e1; /* Lighter grey for better visibility */
+            margin-bottom: 3px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            transition: color 0.3s, letter-spacing 0.3s;
+            margin-right: -0.8em; 
+        }
+
+        .prism-card:hover .label-top {
+            color: #fff;
+            letter-spacing: 1.0em;
+            margin-right: -1.0em;
+        }
+
+        .main-title {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            font-size: 24px;
+            letter-spacing: 0.15em;
+            color: white;
+            text-transform: uppercase;
+            -webkit-text-stroke: 0.8px var(--text-outline); 
+            text-shadow: 0 4px 12px rgba(0,0,0,0.9);
+            position: relative;
+            transition: all 0.4s ease-out;
+        }
+
+        .prism-card:hover .main-title {
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.8), 0 0 40px rgba(34, 211, 238, 0.6);
+            transform: scale(1.05);
+            -webkit-text-stroke: 0.5px rgba(0,0,0,0.5); 
+        }
+
+        /* --- Dynamic Glow Border --- */
+        .glow-border {
+            position: absolute;
+            inset: -1px;
+            border-radius: 13px;
+            background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta), var(--neon-cyan));
+            background-size: 200% 100%;
+            z-index: 0;
+            /* Idle State: Visible and Slow */
+            opacity: 0.35; 
+            filter: blur(15px);
+            animation: borderFlow 8s linear infinite; 
+            transition: opacity 0.5s ease, animation-duration 0.5s ease;
+        }
+
+        /* Hover State: Bright and Fast */
+        .prism-card:hover .glow-border {
+            opacity: 0.7;
+            animation: borderFlow 2s linear infinite;
+        }
+
+        @keyframes borderFlow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <a href="https://us.zenai.biz" class="prism-card" id="card" target="_top">
+        <div class="glow-border"></div>
+        <canvas id="plasma-canvas"></canvas>
+        <canvas id="lightning-canvas"></canvas>
+        <div class="tech-mesh"></div>
+        <div class="glass-surface"></div>
+
+        <div class="content">
+            <div class="label-top">ZEN</div>
+            <div class="main-title">AI ARENA</div>
+        </div>
+    </a>
+
+    <script>
+        const card = document.getElementById('card');
+        const plasmaCanvas = document.getElementById('plasma-canvas');
+        const lightningCanvas = document.getElementById('lightning-canvas');
+        const pCtx = plasmaCanvas.getContext('2d');
+        const lCtx = lightningCanvas.getContext('2d');
+
+        let width, height;
+        let lastTime = 0;
+        let time = 0;
+        let isHovering = false;
+        
+        // Trackers for cursor fluid movement
+        let mousePos = { x: 0, y: 0 };
+        let sourcePos = { x: 0, y: 0 };
+        
+        let lightningBolts = [];
+        let anchorPoints = [];
+
+        // --- Navigation Logic ---
+        card.addEventListener('click', (e) => {
+            e.preventDefault();
+            try {
+                window.top.location.href = "https://us.zenai.biz";
+            } catch (err) {
+                window.open("https://us.zenai.biz", "_blank");
+            }
+        });
+
+        // --- Plasma Blobs Configuration ---
+        // Colors brightened slightly for idle visibility
+        const blobs = [
+            { color: '#0891b2', speed: 0.3, offset: 0, rMult: 1.0 },   // Cyan
+            { color: '#9333ea', speed: 0.4, offset: 2, rMult: 0.9 },   // Violet
+            { color: '#db2777', speed: 0.2, offset: 4, rMult: 1.1 },   // Magenta
+            { color: '#2563eb', speed: 0.5, offset: 1, rMult: 0.8 },   // Blue
+            { color: '#0f172a', speed: 0.1, offset: 3, rMult: 1.3 },   // Void
+        ];
+
+        // --- High-Fidelity Lightning Class ---
+        class Bolt {
+            constructor(index) {
+                this.index = index;
+                this.progress = 0; 
+                this.segments = [];
+                // Alternate colors: Electric Cyan vs Neon Purple
+                this.color = index % 2 === 0 ? '#67e8f9' : '#f0abfc'; 
+            }
+
+            // Generate fractal path between two dynamic points
+            generate(x1, y1, x2, y2) {
+                this.segments = [];
+                this.segments.push({x: x1, y: y1});
+
+                // Calculate perpendicular displacement scaling based on distance
+                const dist = Math.sqrt(Math.pow(x2-x1, 2) + Math.pow(y2-y1, 2));
+                const baseDisplacement = dist * 0.25; // Displacement proportional to length
+
+                const createSegments = (sx, sy, ex, ey, displacement, iteration) => {
+                    if (iteration <= 0) {
+                        this.segments.push({x: ex, y: ey});
+                        return;
+                    }
+                    const midX = (sx + ex) / 2;
+                    const midY = (sy + ey) / 2;
+                    
+                    const dx = ex - sx;
+                    const dy = ey - sy;
+                    // Normal vector
+                    const nx = -dy; 
+                    const ny = dx;
+                    // Normalize (avoid divide by zero)
+                    const len = Math.sqrt(nx*nx + ny*ny) || 1;
+                    
+                    const scale = (Math.random() - 0.5) * displacement;
+                    
+                    const pX = midX + (nx/len) * scale;
+                    const pY = midY + (ny/len) * scale;
+
+                    createSegments(sx, sy, pX, pY, displacement * 0.5, iteration - 1);
+                    createSegments(pX, pY, ex, ey, displacement * 0.5, iteration - 1);
+                };
+
+                // Iteration 5 provides good detail without killing perf on high refresh
+                createSegments(x1, y1, x2, y2, baseDisplacement, 5); 
+            }
+
+            update(dt) {
+                const targetProgress = isHovering ? 1 : 0;
+                // Faster attack, slightly slower decay
+                const speed = isHovering ? 3.0 : 2.0; 
+                this.progress += (targetProgress - this.progress) * speed * dt;
+                
+                // Safety clamp to prevent overshoot
+                if (this.progress > 1) this.progress = 1;
+                if (this.progress < 0) this.progress = 0;
+            }
+
+            draw(ctx) {
+                if (this.progress < 0.01) return;
+                // Safety check for empty segments
+                if (!this.segments || this.segments.length === 0) return;
+
+                let limit = Math.floor(this.segments.length * this.progress);
+                // Clamp limit to array length
+                if (limit > this.segments.length) limit = this.segments.length;
+                
+                if (limit < 2) return;
+
+                ctx.beginPath();
+                const start = this.segments[0];
+                ctx.moveTo(start.x, start.y);
+
+                for (let i = 1; i < limit; i++) {
+                    const p = this.segments[i];
+                    ctx.lineTo(p.x, p.y);
+                }
+                
+                // Main Bolt
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 1.2; 
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.stroke();
+
+                // White Hot Core
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 0.6;
+                ctx.shadowBlur = 0;
+                ctx.stroke();
+
+                // Fractal Branches (occasional)
+                if (this.progress > 0.8) {
+                    const numSegments = this.segments.length;
+                    // Scale branch count by progress
+                    for (let i = 5; i < limit - 5; i += 8) { 
+                        if (Math.random() > 0.3) continue; 
+                        
+                        const p = this.segments[i];
+                        const nextP = this.segments[i+1];
+                        
+                        if (!p || !nextP) continue; // Safety check
+
+                        // Calculate angle of current segment
+                        const angle = Math.atan2(nextP.y - p.y, nextP.x - p.x);
+                        // Branch off at ~45-90 degrees
+                        const branchAngle = angle + (Math.random() < 0.5 ? 1 : -1) * (0.5 + Math.random() * 0.8);
+                        const branchLen = 15 + Math.random() * 20;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(
+                            p.x + Math.cos(branchAngle) * branchLen,
+                            p.y + Math.sin(branchAngle) * branchLen
+                        );
+                        ctx.strokeStyle = this.color;
+                        ctx.lineWidth = 0.5;
+                        ctx.shadowBlur = 8;
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        function resize() {
+            const rect = card.getBoundingClientRect();
+            width = rect.width + 60; 
+            height = rect.height + 60;
+            
+            const lWidth = rect.width;
+            const lHeight = rect.height;
+
+            const dpr = window.devicePixelRatio || 1;
+            
+            // Plasma Canvas
+            plasmaCanvas.width = width * dpr;
+            plasmaCanvas.height = height * dpr;
+            pCtx.resetTransform();
+            pCtx.scale(dpr, dpr);
+            
+            // Lightning Canvas
+            lightningCanvas.width = lWidth * dpr;
+            lightningCanvas.height = lHeight * dpr;
+            lCtx.resetTransform();
+            lCtx.scale(dpr, dpr);
+
+            blobs.forEach(b => {
+                b.baseR = Math.min(width, height) * b.rMult;
+            });
+
+            // Initialize Anchor Points (Fixed targets on perimeter)
+            anchorPoints = [];
+            lightningBolts = [];
+            const cx = lWidth / 2;
+            const cy = lHeight / 2;
+            const radius = Math.max(lWidth, lHeight) * 0.7; 
+
+            for (let i = 0; i < 7; i++) {
+                // 7 Points evenly distributed around center
+                const angle = (Math.PI * 2 / 7) * i - (Math.PI / 2); 
+                const ax = cx + Math.cos(angle) * radius;
+                const ay = cy + Math.sin(angle) * radius;
+                anchorPoints.push({x: ax, y: ay});
+                
+                lightningBolts.push(new Bolt(i));
+            }
+
+            // Reset Source to Center initially
+            sourcePos = { x: cx, y: cy };
+            if (!isHovering) {
+                mousePos = { x: cx, y: cy };
+            }
+        }
+
+        window.addEventListener('resize', resize);
+        // Force an initial resize/paint
+        resize();
+
+        // Interaction
+        card.addEventListener('mouseenter', () => { isHovering = true; });
+        card.addEventListener('mouseleave', () => { isHovering = false; });
+        
+        card.addEventListener('mousemove', (e) => {
+            const rect = card.getBoundingClientRect();
+            // Update target mouse position relative to canvas
+            mousePos.x = e.clientX - rect.left;
+            mousePos.y = e.clientY - rect.top;
+            
+            // 3D Tilt
+            const xNorm = (e.clientX - rect.left) / rect.width;
+            const yNorm = (e.clientY - rect.top) / rect.height;
+            const tiltX = (yNorm - 0.5) * -12; 
+            const tiltY = (xNorm - 0.5) * 12;
+            card.style.transform = `perspective(800px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) scale(1.03)`;
+        });
+
+        // --- Main Animation Loop ---
+        function animate(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            let dt = (timestamp - lastTime) / 1000; // Delta time in seconds
+            // Clamp dt to prevent physics explosions on lag/tab switch
+            if (dt > 0.1) dt = 0.1;
+            lastTime = timestamp;
+
+            if (!width || !height) {
+                requestAnimationFrame(animate);
+                return;
+            }
+
+            // --- 1. Plasma Physics ---
+            pCtx.clearRect(0, 0, width, height);
+            pCtx.fillStyle = '#020617'; 
+            pCtx.fillRect(0, 0, width, height);
+            
+            // Smooth time progression
+            const flowSpeed = isHovering ? 1.5 : 0.8;
+            time += dt * flowSpeed;
+
+            pCtx.globalCompositeOperation = 'screen'; 
+            blobs.forEach((blob, i) => {
+                const movementRadius = width * 0.35;
+                const nx = Math.sin(time * blob.speed + blob.offset) * movementRadius;
+                const ny = Math.cos(time * blob.speed * 0.7 + blob.offset * 1.5) * (height * 0.45);
+                
+                const drawX = (width / 2) + nx;
+                const drawY = (height / 2) + ny;
+                const radius = blob.baseR;
+
+                const gradient = pCtx.createRadialGradient(drawX, drawY, 0, drawX, drawY, radius);
+                gradient.addColorStop(0, blob.color);
+                gradient.addColorStop(0.6, `rgba(0,0,0,0)`);
+
+                pCtx.fillStyle = gradient;
+                pCtx.beginPath();
+                pCtx.arc(drawX, drawY, radius, 0, Math.PI * 2);
+                pCtx.fill();
+            });
+            pCtx.globalCompositeOperation = 'source-over';
+
+            // --- 2. Lightning Physics & Logic ---
+            const lRect = lightningCanvas.getBoundingClientRect();
+            lCtx.clearRect(0, 0, lRect.width, lRect.height);
+            
+            const cx = lRect.width / 2;
+            const cy = lRect.height / 2;
+
+            // Determine Target Source Position
+            // If hovering, target is mouse. If not, target is center.
+            const targetX = isHovering ? mousePos.x : cx;
+            const targetY = isHovering ? mousePos.y : cy;
+
+            // Fluid Lerp for Source Position
+            const lerpSpeed = 8.0; // Higher = Snappier, Lower = Floaty
+            sourcePos.x += (targetX - sourcePos.x) * lerpSpeed * dt;
+            sourcePos.y += (targetY - sourcePos.y) * lerpSpeed * dt;
+
+            // Update Bolts
+            lightningBolts.forEach((bolt, i) => {
+                bolt.update(dt);
+                const anchor = anchorPoints[i];
+                if (!anchor) return; // Safety check
+                
+                // Regenerate path every frame for "Electricity" look
+                // Connect current SourcePos to fixed Anchor
+                // Only generate if visible or charging up
+                if (bolt.progress > 0.01) {
+                    bolt.generate(sourcePos.x, sourcePos.y, anchor.x, anchor.y);
+                    bolt.draw(lCtx);
+                }
+            });
+
+            // Draw Energy Core at Source Position
+            const maxProgress = Math.max(...lightningBolts.map(b => b.progress));
+            if (maxProgress > 0.01) {
+                const g = lCtx.createRadialGradient(sourcePos.x, sourcePos.y, 0, sourcePos.x, sourcePos.y, 40);
+                g.addColorStop(0, `rgba(255, 255, 255, ${maxProgress})`);
+                g.addColorStop(0.2, `rgba(34, 211, 238, ${maxProgress * 0.8})`);
+                g.addColorStop(1, 'transparent');
+                lCtx.fillStyle = g;
+                lCtx.beginPath();
+                lCtx.arc(sourcePos.x, sourcePos.y, 40, 0, Math.PI * 2);
+                lCtx.fill();
+            }
+
+            // Tilt Reset when not hovering
+            if (!isHovering) {
+                 card.style.transform = `perspective(800px) rotateX(0deg) rotateY(0deg) scale(1)`;
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        requestAnimationFrame(animate);
+
+    </script>
+</body>
+</html>
