@@ -1,0 +1,375 @@
+"use client"
+
+import type React from "react"
+import { useEffect, useRef } from "react"
+import { cn } from "@/lib/utils"
+import { useTheme } from "next-themes"
+
+// Organic Fluid Noise Generator
+const createFluidNoise = () => {
+  return (x: number, y: number, z: number) => {
+    let n = 0
+    n += Math.sin(x * 0.01 + z) * Math.cos(y * 0.01 - z)
+    n += Math.sin(y * 0.02 - z * 0.5) * Math.cos(x * 0.02 + z * 0.5) * 0.5
+    return n
+  }
+}
+
+// Deeply technical AI, Infrastructure, and Math lexicon
+const AI_TOKENS = [
+  // Syntax & Logic
+  '{', '}', '/>', '<>', '()', '[]', '0', '1', '::', '=>', '++', '&&', '||', '!=', '===',
+  // Math & Calculus
+  'λ', 'Σ', '∆', '≈', 'ƒ', '∈', '∀', '∃', '⊗', '∇', '∫', 'μ', 'σ', 'θ', 'Φ', 'Ω', 'β', 'O(N)', 'O(1)',
+  // Neural Net & Deep Learning Primitives
+  'tensor', 'epoch', 'loss', 'weights', 'bias', 'ReLU', 'softmax', 'gradient', 'backprop', 'logits',
+  'transformer', 'query', 'key', 'value', 'attention', 'embedding', 'vector', 'matrix', 'stride',
+  // Hardware & Infra
+  'vRAM', 'CUDA', 'fp16', 'int8', 'RAG', 'node', 'cluster', 'async', 'await', 'yield',
+  // LLM specifics
+  '<eos>', '[CLS]', '[SEP]', 'pad', 'token', 'context'
+]
+
+export interface ZenLiquidGlassProps {
+  className?: string
+  /** Number of flowing tokens */
+  particleCount?: number
+  /** Base speed of the upward flow */
+  flowSpeed?: number
+  /** Base color of the tokens and strikes (hex or rgba) */
+  color?: string
+}
+
+interface Point {
+  x: number
+  y: number
+  distanceToNext: number
+}
+
+interface NetworkStrike {
+  path: Point[]
+  totalLength: number
+  progress: number // 0 to 1, tracks the head of the data packet
+  speed: number
+  decay: number // 1 down to 0, tracks the fade after packet arrives
+}
+
+export const ZenLiquidGlass: React.FC<ZenLiquidGlassProps> = ({
+  className,
+  particleCount = 350, // Massively increased count since they are much smaller
+  flowSpeed = 0.5,
+  color = "#000000",
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const container = containerRef.current
+    if (!canvas || !container) return
+
+    const ctx = canvas.getContext("2d", { alpha: true })
+    if (!ctx) return
+
+    const noise3D = createFluidNoise()
+    let animationId: number
+
+    // Particle state: x, y, size, speedMultiplier, swayOffset, opacity, tokenIndex, depthZ
+    const propCount = 8
+    const propsLength = particleCount * propCount
+    const particles = new Float32Array(propsLength)
+    
+    // Active silicon data transmissions
+    const strikes: NetworkStrike[] = []
+
+    let width = 0
+    let height = 0
+    let tick = 0
+
+    const getRgb = (hex: string) => {
+      const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i
+      const fullHex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b)
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(fullHex)
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 0, g: 0, b: 0 }
+    }
+    const rgb = getRgb(color)
+
+    const setupCanvas = () => {
+      const rect = container.getBoundingClientRect()
+      width = rect.width
+      height = rect.height
+      const dpr = window.devicePixelRatio || 1
+      canvas.width = width * dpr
+      canvas.height = height * dpr
+      canvas.style.width = `${width}px`
+      canvas.style.height = `${height}px`
+      ctx.scale(dpr, dpr)
+    }
+
+    const initParticle = (i: number, isInitial = false) => {
+      const x = Math.random() * width
+      const y = isInitial ? Math.random() * height : height + 10 + Math.random() * 50
+      
+      // 3D Depth Field Engine
+      const depthZ = Math.random() // 0 = far background, 1 = extreme foreground
+      
+      // Much smaller, highly refined micro-typography (4px to 11px)
+      const size = 4 + (depthZ * 7)
+      
+      // Far particles move slower, near particles move faster
+      const speedMultiplier = 0.3 + (depthZ * 0.8)
+      
+      const swayOffset = Math.random() * Math.PI * 2
+      
+      // Far particles are dimmer, near particles are sharper
+      const opacity = 0.1 + (depthZ * 0.5)
+      
+      const tokenIndex = Math.floor(Math.random() * AI_TOKENS.length)
+
+      particles.set([x, y, size, speedMultiplier, swayOffset, opacity, tokenIndex, depthZ], i)
+    }
+
+    const initAllParticles = () => {
+      for (let i = 0; i < propsLength; i += propCount) {
+        initParticle(i, true)
+      }
+    }
+
+    // Advanced Routing: Generates a PCB-style path with exact segment lengths for animation
+    const generatePath = (startX: number, startY: number, dirX: number): NetworkStrike => {
+      let x = startX
+      let y = startY
+      const path: Point[] = [{ x, y, distanceToNext: 0 }]
+      let totalLength = 0
+      const segments = 4 + Math.floor(Math.random() * 6)
+
+      for (let i = 0; i < segments; i++) {
+        const isDiagonal = i % 2 !== 0
+        const segmentLength = 30 + Math.random() * 150
+
+        if (isDiagonal) {
+          const dirY = Math.random() > 0.5 ? 1 : -1
+          const dist = segmentLength * 0.707
+          x += dirX * dist
+          y += dirY * dist
+        } else {
+          x += dirX * segmentLength
+        }
+        
+        path[path.length - 1].distanceToNext = segmentLength
+        totalLength += segmentLength
+        path.push({ x, y, distanceToNext: 0 })
+      }
+
+      return {
+        path,
+        totalLength,
+        progress: 0,
+        speed: (2.5 + Math.random() * 2) / totalLength, // Normalized speed based on path length
+        decay: 1.0
+      }
+    }
+
+    const spawnNeuralCluster = () => {
+      const isLeft = Math.random() > 0.5
+      const startX = isLeft ? -20 : width + 20
+      const startY = height * 0.1 + Math.random() * (height * 0.8)
+      const dirX = isLeft ? 1 : -1
+
+      // Spawn a primary strike, and 1-2 secondary strikes from the exact same origin
+      // This creates a "neural tree" spreading effect
+      const branches = 1 + Math.floor(Math.random() * 3)
+      for(let i = 0; i < branches; i++) {
+         // Slight delay for branches creates a cascading transmission effect
+         setTimeout(() => {
+           strikes.push(generatePath(startX, startY, dirX))
+         }, i * 150)
+      }
+    }
+
+    const drawTokenParticle = (x: number, y: number, size: number, opacity: number, tokenIndex: number) => {
+      const token = AI_TOKENS[tokenIndex] || AI_TOKENS[0]
+      
+      ctx.font = `300 ${size}px "JetBrains Mono", "Fira Code", "SF Mono", monospace`
+      ctx.textAlign = "center"
+      ctx.textBaseline = "middle"
+
+      // Refractive "Glass" Sub-layer
+      ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacity * 0.3})`
+      ctx.fillText(token, x, y + size * 0.1) // Tighter shadow for smaller text
+
+      // Razor-sharp core layer
+      ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacity})`
+      ctx.fillText(token, x, y)
+    }
+
+    const drawStrikes = () => {
+      for (let i = strikes.length - 1; i >= 0; i--) {
+        const strike = strikes[i]
+        
+        // 1. Advance the data packet
+        if (strike.progress < 1) {
+          strike.progress += strike.speed
+        } else {
+          strike.decay -= 0.015 // Begin fading optical trail once packet reaches end
+        }
+
+        if (strike.decay <= 0) {
+          strikes.splice(i, 1)
+          continue
+        }
+
+        // Calculate exact pixel position of the "data packet" head
+        const currentTargetDistance = Math.min(1, strike.progress) * strike.totalLength
+        let traversed = 0
+        let headX = strike.path[0].x
+        let headY = strike.path[0].y
+        let headIndex = 0
+
+        ctx.beginPath()
+        ctx.moveTo(strike.path[0].x, strike.path[0].y)
+
+        // Draw the optical trail up to the head
+        for (let j = 0; j < strike.path.length - 1; j++) {
+          const pt = strike.path[j]
+          const nextPt = strike.path[j + 1]
+          
+          if (traversed + pt.distanceToNext <= currentTargetDistance) {
+            // Entire segment is drawn
+            ctx.lineTo(nextPt.x, nextPt.y)
+            traversed += pt.distanceToNext
+            headX = nextPt.x
+            headY = nextPt.y
+            headIndex = j + 1
+          } else {
+            // Segment is partially drawn
+            const remainder = currentTargetDistance - traversed
+            const ratio = remainder / pt.distanceToNext
+            headX = pt.x + (nextPt.x - pt.x) * ratio
+            headY = pt.y + (nextPt.y - pt.y) * ratio
+            ctx.lineTo(headX, headY)
+            break
+          }
+        }
+
+        ctx.lineJoin = "bevel"
+        
+        // Base faint circuit trail
+        ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${strike.decay * 0.15})`
+        ctx.lineWidth = 1
+        ctx.stroke()
+
+        // If packet is still moving, draw the brilliant leading head
+        if (strike.progress < 1) {
+          // Packet core
+          ctx.beginPath()
+          ctx.arc(headX, headY, 2.5, 0, Math.PI * 2)
+          ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.9)`
+          ctx.fill()
+
+          // Packet outer glow (simulating light scattering in glass)
+          ctx.beginPath()
+          ctx.arc(headX, headY, 8, 0, Math.PI * 2)
+          ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`
+          ctx.fill()
+        }
+
+        // Draw structural nodes at completed junctions
+        ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${strike.decay * 0.4})`
+        for (let j = 0; j <= headIndex; j++) {
+           ctx.beginPath()
+           ctx.arc(strike.path[j].x, strike.path[j].y, 1.5, 0, Math.PI * 2)
+           ctx.fill()
+        }
+      }
+    }
+
+    const animate = () => {
+      tick++
+      ctx.clearRect(0, 0, width, height)
+
+      // Neural routing transmissions (2% chance per frame to fire a cluster)
+      if (Math.random() < 0.02) {
+        spawnNeuralCluster()
+      }
+      
+      // Draw strikes underneath the flowing code
+      drawStrikes()
+
+      const zOff = tick * 0.0015 // Slower, heavier liquid flow
+
+      // Liquid Code Tokens
+      for (let i = 0; i < propsLength; i += propCount) {
+        let x = particles[i]
+        let y = particles[i + 1]
+        const size = particles[i + 2]
+        const speed = particles[i + 3]
+        const swayOffset = particles[i + 4]
+        const opacity = particles[i + 5]
+        const tokenIndex = particles[i + 6]
+        const depthZ = particles[i + 7]
+
+        // Depth affects how much horizontal sway the particle has (foreground sways more)
+        const noise = noise3D(x, y, zOff)
+        x += Math.sin(swayOffset + noise * Math.PI) * (0.1 + depthZ * 0.4)
+        y -= flowSpeed * speed
+
+        drawTokenParticle(x, y, size, opacity, tokenIndex)
+
+        // Respawn if floated off top
+        if (y < -20) {
+          initParticle(i, false)
+        } else {
+          particles[i] = x
+          particles[i + 1] = y
+        }
+      }
+
+      animationId = requestAnimationFrame(animate)
+    }
+
+    setupCanvas()
+    initAllParticles()
+    animate()
+
+    const resizeObserver = new ResizeObserver(() => {
+      setupCanvas()
+      initAllParticles()
+    })
+    resizeObserver.observe(container)
+
+    return () => {
+      cancelAnimationFrame(animationId)
+      resizeObserver.disconnect()
+    }
+  }, [particleCount, flowSpeed, color])
+
+  return (
+    <div ref={containerRef} className={cn("absolute inset-0 overflow-hidden pointer-events-none", className)}>
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+    </div>
+  )
+}
+
+export const ZenLiquidGlassDemo = () => {
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
+
+  return (
+    <div className="relative w-full h-screen min-h-[500px]">
+      <ZenLiquidGlass
+        color={isDark ? '#FFFFFF' : '#0F172A'}
+        className={cn(
+          'absolute inset-0 flex items-center justify-center rounded-xl',
+          'dark:bg-[radial-gradient(ellipse_at_bottom,_#262626_0%,_#000_100%)] bg-[radial-gradient(ellipse_at_bottom,_#f5f5f5_0%,_#fff_100%)]'
+        )}
+      />
+    </div>
+  )
+}
+
+export default ZenLiquidGlassDemo
